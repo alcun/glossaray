@@ -1,0 +1,106 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Glossaray - live speech translation"
+  description="Hold to talk, and hear yourself translated. The web version of the Glossaray translation stick."
+>
+  <main class="room" id="app" data-mode="device">
+    <!--
+      DEVICE. The board, 1:1. Every position in here is in the firmware's own
+      coordinate space - a 368x448 CO5300 panel - and the whole thing is scaled
+      to the viewport as one unit. Move a number here and it should be because
+      display.cpp moved it too.
+    -->
+    <div class="stage" id="stage" data-scene="boot">
+      <div class="screen">
+        <!-- Boot: the CRT line, the wordmark, the fish. drawBootIntro(). -->
+        <div class="boot-line" id="bootLine"></div>
+        <canvas class="fish" id="fish" width="112" height="77"></canvas>
+        <p class="wordmark">GLOSSARAY</p>
+
+        <!-- Ready: showReady(). -->
+        <button class="pair" id="pair" type="button">EN -&gt; IT</button>
+        <div class="rule rule-top"></div>
+        <p class="hold-label">^ HOLD TO TALK</p>
+        <div class="rule rule-bottom"></div>
+        <button class="tap-next" id="tapNext" type="button">v TAP NEXT ES</button>
+        <button class="swap" id="swap" type="button">v v SWAP DIRECTION</button>
+
+        <!-- Status: showStatus(). One box, a title, a rule, a detail. -->
+        <div class="status-box"></div>
+        <p class="status-title" id="statusTitle" role="status" aria-live="polite"></p>
+        <div class="rule status-rule"></div>
+        <p class="status-detail" id="statusDetail"></p>
+
+        <!-- The listening meter, from the v0 reference: rectangular bars on an
+             integer grid. The board does not have one; it is the answer to the
+             only question a LISTENING screen is ever asked. -->
+        <div class="meter" id="meter" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+
+        <!-- Translation: showTranslation(). One pane at one size, and what
+             will not fit scrolls a line at a time: the board cannot draw a
+             smaller face, and the tap that would turn a page is REPEAT. -->
+        <p class="result" id="result" role="status" aria-live="polite"></p>
+        <p class="footer-one" id="footerOne"></p>
+        <p class="footer-two" id="footerTwo"></p>
+
+        <!-- The top button. The device has a real one; here the panel is it. -->
+        <button class="talk" id="talk" type="button" aria-label="Hold to talk"></button>
+      </div>
+    </div>
+
+    <!--
+      WEB. The same session with the browser's affordances: both sides at once,
+      text as it arrives, and the turns before this one still on screen.
+    -->
+    <div class="web">
+      <header class="web-head">
+        <label class="visually-hidden" for="webSource">Language you speak</label>
+        <select id="webSource"></select>
+        <button id="webSwap" type="button" class="web-swap" aria-label="Swap direction">
+          &#8646;
+        </button>
+        <label class="visually-hidden" for="webTarget">Language to translate into</label>
+        <select id="webTarget"></select>
+      </header>
+
+      <div class="log-area">
+        <div class="log" id="log" role="log" aria-live="polite"></div>
+        <p class="log-empty" id="logEmpty">
+          Hold the button and say something. What you said and what it said
+          come back here, and the translation is spoken aloud.
+        </p>
+      </div>
+
+      <p class="web-hint" id="webHint" data-tone="normal"></p>
+      <button class="web-talk" id="webTalk" type="button">Hold to talk</button>
+    </div>
+
+    <!-- Outside the panel on purpose: a control on the 368x448 surface would
+         mean device mode is no longer the device. -->
+    <nav class="modes" aria-label="Display mode">
+      <button type="button" data-mode="device" aria-pressed="true">Device</button>
+      <button type="button" data-mode="web" aria-pressed="false">Web</button>
+    </nav>
+
+    <!-- Real text for anything that does not run JavaScript, and for search. -->
+    <div class="visually-hidden">
+      <h1>Glossaray - live speech translation in your browser</h1>
+      <p>
+        Hold the button, speak, and hear the translation back. Your microphone
+        opens when you hold the button and is released again when you stop
+        using it, audio is relayed live and never stored, and nothing is
+        written down. Eleven languages: English to and from Italian,
+        Spanish, French, Welsh, German, Polish, Turkish, Russian, Japanese and
+        Chinese. This is the browser version of the Glossaray translation stick, an
+        ESP32-S3 instrument, and the device view is a faithful port of its screen.
+      </p>
+    </div>
+  </main>
+
+  <script src="../scripts/glossaray.ts"></script>
+</Base>

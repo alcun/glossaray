@@ -1,0 +1,493 @@
+/*
+ * The Glossaray panel, in device coordinates.
+ *
+ * The firmware draws to a 368x448 CO5300 AMOLED with the built-in 5x7 GFX
+ * face, where a glyph at "size N" is 5N x 7N with a 6N advance. Everything
+ * below works in those units: the stage is literally 368x448 and is scaled to
+ * the viewport as one unit, so the layout cannot drift from display.cpp.
+ *
+ * Type sizing follows from that. A monospace face has a ~0.6em advance and a
+ * ~0.7em cap height, so font-size 10N gives an advance of 6N and caps of 7N -
+ * the device's metrics exactly. A line box of 10N centred on the glyph puts its
+ * top 1.5N above the firmware's y, which is where the offsets come from.
+ */
+:root {
+  /* display.cpp palette(), rgb565 sources. */
+  --background: #050207;
+  --surface: #241033;
+  --active: #713fad;
+  --text: #c6a0ff;
+  --status: #4fdde5;
+
+  --face: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "DejaVu Sans Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--face);
+  -webkit-font-smoothing: none;
+  overscroll-behavior: none;
+}
+
+.room {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  align-items: center;
+  min-height: 100dvh;
+  /* A press-and-hold on a phone is, by default, a request for the text
+     magnifier, a selection handle and a context menu. All three land on top of
+     the panel mid-phrase, so all three are refused here. `touch-action: none`
+     rather than `manipulation` because holding must not start a scroll. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* The panel, scaled as one unit. --k is set from JS on resize. */
+.stage {
+  width: 368px;
+  height: 448px;
+  transform: scale(var(--k, 1));
+  transform-origin: center center;
+}
+
+.screen {
+  position: relative;
+  width: 368px;
+  height: 448px;
+  overflow: hidden;
+  background: var(--background);
+  /* The physical panel has a rounded bezel; this is the only liberty taken. */
+  border-radius: 26px;
+}
+
+/* Text primitives -------------------------------------------------------- */
+
+.screen p,
+.screen button {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: center;
+  font-family: var(--face);
+  letter-spacing: 0;
+  white-space: pre;
+  color: inherit;
+}
+
+.screen button {
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* size 3: font-size 30, line box 30, top = y - 4.5 */
+.size-3 { font-size: 30px; line-height: 30px; }
+/* size 2: font-size 20, line box 20, top = y - 3 */
+.size-2 { font-size: 20px; line-height: 20px; }
+/* size 5: font-size 50, line box 50, top = y - 7.5 */
+.size-5 { font-size: 50px; line-height: 50px; }
+
+.rule { position: absolute; height: 2px; }
+
+/* Ready scene - showReady() ---------------------------------------------- */
+
+.screen .pair {
+  top: 67.5px;                    /* firmware y=72, size 3 */
+  font-size: 30px;
+  line-height: 30px;
+  color: var(--status);
+}
+
+.screen .rule-top { left: 40px; top: 103px; width: 288px; background: var(--active); }
+.screen .rule-bottom { left: 40px; top: 378px; width: 288px; background: var(--surface); }
+
+.screen .hold-label {
+  top: 241.5px;                   /* firmware y=246, size 3 */
+  font-size: 30px;
+  line-height: 30px;
+  color: var(--text);
+}
+
+.screen .tap-next {
+  top: 395px;                     /* firmware y=398, size 2 */
+  font-size: 20px;
+  line-height: 20px;
+  color: var(--status);
+}
+
+.screen .swap {
+  top: 421px;                     /* firmware y=424, size 2 */
+  font-size: 20px;
+  line-height: 20px;
+  color: var(--active);
+}
+
+/* Status scene - showStatus() -------------------------------------------- */
+
+.screen .status-box {
+  position: absolute;
+  left: 24px;
+  top: 128px;
+  width: 320px;
+  height: 192px;
+  border: 2px solid var(--active);
+}
+
+.screen .status-title {
+  top: 185.5px;                   /* firmware y=190, size 3 */
+  font-size: 30px;
+  line-height: 30px;
+  color: var(--text);
+}
+
+.screen .status-rule { left: 104px; top: 239px; width: 160px; background: var(--surface); }
+
+.screen .status-detail {
+  top: 267px;                     /* firmware y=270, size 2 */
+  font-size: 20px;
+  line-height: 20px;
+  color: var(--status);
+  padding: 0 30px;
+  white-space: normal;
+}
+
+/* The stepped feedback row, below the status box which ends at 320. Eight bars
+   of 28 with 8 between them is exactly 280, and four of them centre in the same
+   width - so LISTENING's meter and TRANSLATING's progress occupy one row and
+   one element. Bars only ever step: no transition, no partial bar. */
+/* NO display here. `.screen .meter` outranks the scene list's `display: none`,
+   so setting it visible in this block put the row on every scene - it sat under
+   the translation with whatever the last turn left lit. Only the status scene
+   turns it on, and only that rule may. */
+.screen .meter {
+  position: absolute;
+  left: 44px;
+  top: 344px;
+  width: 280px;
+  justify-content: center;
+  gap: 8px;
+}
+/* [■□□□] through [■■■■], as the reference writes it. */
+.screen .meter[data-mode="progress"] i:nth-child(n + 5) { display: none; }
+.screen .meter i {
+  width: 28px;
+  height: 14px;
+  background: var(--surface);
+}
+.screen .meter i[data-on="true"] { background: var(--status); }
+
+/* Translation scene - showTranslation() ----------------------------------- */
+
+/* drawWrappedResult() draws in u8g2 unifont at size 2, not the panel's 5x7
+   face: 16px per character across 288px, which is eighteen characters a line.
+   font-size alone cannot guarantee that advance on every platform, so the
+   exact letter-spacing is measured and set in device.ts. The line breaks are
+   the firmware's, computed there, so this must not wrap on its own. */
+.screen .result {
+  left: 40px;
+  top: 132px;                     /* first baseline 146, line height 34 */
+  width: 288px;
+  font-size: 27px;
+  line-height: 34px;
+  color: var(--text);
+  white-space: pre;
+  overflow: hidden;
+  max-height: 238px;              /* seven lines, as drawWrappedResult() */
+}
+
+.screen .footer-one {
+  top: 395px;                     /* baseline 398, beside a second footer */
+  font-size: 20px;
+  line-height: 20px;
+  color: var(--status);
+}
+
+/* showTranslation() drops the single footer to baseline 410 when there is no
+   second one, rather than leaving a gap where it would have been. */
+.stage[data-footers="one"] .footer-one { top: 407px; }
+
+.screen .footer-two {
+  top: 421px;
+  font-size: 20px;
+  line-height: 20px;
+  color: var(--active);
+}
+
+/* Boot scene - drawBootIntro() -------------------------------------------- */
+
+.screen .boot-line {
+  position: absolute;
+  left: 50%;
+  top: 174px;
+  height: 6px;
+  width: 0;
+  transform: translateX(-50%);
+  background: var(--status);
+}
+
+.screen .fish {
+  position: absolute;
+  left: 131px;                    /* (368 - 112) / 2 + 3 */
+  top: 72px;
+  width: 112px;
+  height: 77px;
+  image-rendering: pixelated;
+}
+
+.screen .wordmark {
+  top: 197.5px;                   /* firmware y=205, size 5 */
+  font-size: 50px;
+  line-height: 50px;
+  color: var(--text);
+}
+
+/* The panel is the button. It sits between the two rules, so the footer
+   controls stay tappable and a hold cannot start on top of them. */
+.screen .talk {
+  left: 0;
+  top: 103px;
+  width: 100%;
+  height: 275px;
+  background: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.stage[data-holding="true"] .rule-top,
+.stage[data-holding="true"] .rule-bottom { background: var(--status); }
+
+/* Scene visibility ------------------------------------------------------- */
+
+.boot-line, .fish, .wordmark,
+.pair, .rule-top, .hold-label, .rule-bottom, .tap-next, .swap,
+.status-box, .status-title, .status-rule, .status-detail,
+.result, .footer-one, .footer-two, .meter,
+.screen .talk { display: none; }
+
+.stage[data-scene="boot"] .boot-line,
+.stage[data-scene="boot"] .fish,
+.stage[data-scene="boot"] .wordmark { display: block; }
+
+.stage[data-scene="ready"] .pair,
+.stage[data-scene="ready"] .rule-top,
+.stage[data-scene="ready"] .hold-label,
+.stage[data-scene="ready"] .rule-bottom,
+.stage[data-scene="ready"] .tap-next,
+.stage[data-scene="ready"] .swap,
+.stage[data-scene="ready"] .talk { display: block; }
+
+.stage[data-scene="status"] .status-box,
+.stage[data-scene="status"] .status-title,
+.stage[data-scene="status"] .status-rule,
+.stage[data-scene="status"] .status-detail,
+.stage[data-scene="status"] .talk { display: block; }
+.stage[data-scene="status"]:not([data-meter="off"]) .meter { display: flex; }
+
+.stage[data-scene="result"] .pair,
+.stage[data-scene="result"] .rule-top,
+.stage[data-scene="result"] .result,
+.stage[data-scene="result"] .rule-bottom,
+.stage[data-scene="result"] .footer-one,
+.stage[data-scene="result"] .footer-two,
+.stage[data-scene="result"] .talk { display: block; }
+
+/* Holding: the device redraws to LISTENING, so the talk target stays live but
+   the status scene owns the panel. Nothing else needs a state style. */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fish { animation: none !important; }
+}
+
+
+/* Mode switching ---------------------------------------------------------- */
+
+.room[data-mode="device"] .web,
+.room[data-mode="web"] .stage { display: none; }
+
+.modes {
+  display: flex;
+  gap: 2px;
+  margin: 14px 0 18px;
+  padding: 2px;
+  border: 1px solid var(--surface);
+  border-radius: 999px;
+}
+
+.modes button {
+  padding: 7px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--active);
+  font: 500 12px/1 var(--face);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.modes button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Web mode ---------------------------------------------------------------- */
+/* The panel's rules do not apply here. This is the same session with a
+   browser's affordances: both sides at once, text as it arrives, and the turns
+   before this one still on screen. */
+
+.web {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  width: min(560px, 100vw);
+  height: min(760px, calc(100dvh - 76px));
+  padding: 0 16px;
+  gap: 12px;
+}
+
+.web-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0 12px;
+}
+
+.web-head select {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--surface);
+  border-radius: 10px;
+  background: var(--background);
+  color: var(--text);
+  font: 15px/1 var(--face);
+}
+
+.web-swap {
+  padding: 10px 13px;
+  border: 1px solid var(--surface);
+  border-radius: 10px;
+  background: none;
+  color: var(--status);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.web-swap:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* The log and the empty line share one cell, so "nothing said yet" sits in the
+   middle of the space a conversation will fill rather than under it. */
+.log-area { position: relative; }
+
+.log {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+/* Anchor the conversation to the bottom, so the newest turn is nearest the
+   thumb. `margin-top: auto` on the first row rather than justify-content:
+   flex-end, which can put the oldest rows out of scrolling reach. */
+.log > :first-child { margin-top: auto; }
+
+.log-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.line .tag {
+  padding-top: 3px;
+  color: var(--active);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.said-by-you .body { color: #8f7bb0; }
+.said-by-it .body { color: var(--text); }
+
+.log-empty > * { max-width: 34ch; }
+
+/* When there is a conversation the empty line goes and the log takes the room. */
+.log-empty[hidden] { display: none; }
+
+.log-empty {
+  max-width: 34ch;
+  margin: 0 auto;
+  color: #6b5a86;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.web-hint {
+  margin: 0;
+  min-height: 18px;
+  color: var(--status);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.web-hint[data-tone="error"] { color: #ff9a9a; text-transform: none; letter-spacing: 0; }
+
+.web-talk {
+  margin-bottom: 4px;
+  padding: 20px;
+  border: 1px solid var(--active);
+  border-radius: 14px;
+  background: var(--background);
+  color: var(--text);
+  font: 15px/1 var(--face);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.web-talk[data-holding="true"] {
+  border-color: var(--status);
+  background: var(--surface);
+  color: var(--status);
+}

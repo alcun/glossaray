@@ -1,0 +1,9 @@
+{
+  "name": "glossaray-server",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "test": "bun test"
+  }
+}

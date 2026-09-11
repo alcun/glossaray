@@ -1,0 +1,20 @@
+# Hosted build configuration for the maintained service.
+FROM node:22-alpine AS web
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json* ./
+RUN npm ci --no-audit --no-fund
+COPY web/ ./
+ENV PUBLIC_SITE_URL=https://glossaray.alcun.dev
+RUN npm run build
+
+FROM oven/bun:1-alpine AS run
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000 GLOSSARAY_PUBLIC_DIR=/app/public GLOSSARAY_TRUST_PROXY=true
+COPY server/src ./src
+COPY --from=web /src/web/dist ./public
+USER bun
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=4s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3000/healthz || exit 1
+CMD ["bun", "run", "src/index.ts"]
+

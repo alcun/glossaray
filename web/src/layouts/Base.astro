@@ -1,0 +1,54 @@
+---
+import "../styles/glossaray.css";
+
+interface Props {
+  title: string;
+  description: string;
+}
+const { title, description } = Astro.props;
+const site = import.meta.env.PUBLIC_SITE_URL || "http://localhost:3000";
+const canonical = new URL(Astro.url.pathname, site).href;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#050207" />
+
+    <!-- It is a device, so it should be installable as one. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/fish.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Glossaray" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={new URL("/icon-512.png", site).href} />
+
+    <!--
+      LoggerLizard analytics. A PUBLIC key, whitelisted to this host - a public
+      key with no domain list is refused outright, which is what makes
+      publishing it safe. Page views only; no audio, no transcript, ever.
+    -->
+    <script
+      src="https://api.loggerlizard.com/js/lizard.js"
+      data-api-key="llz_pub_0756717ef9ac4a5cbbc21897c67de528"
+      is:inline></script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf 'Gemini API key: '
+IFS= read -rs gemini_key
+printf '\nPublic origin [http://localhost:3000]: '
+IFS= read -r public_origin
+public_origin=${public_origin:-http://localhost:3000}
+
+if [[ -z "$gemini_key" ]]; then
+  echo "A Gemini API key is required."
+  exit 1
+fi
+
+if command -v openssl >/dev/null 2>&1; then
+  device_token=$(openssl rand -hex 32)
+else
+  device_token=$(LC_ALL=C tr -dc 'a-f0-9' </dev/urandom | head -c 64)
+fi
+
+umask 077
+{
+  printf 'GEMINI_API_KEY=%s\n' "$gemini_key"
+  printf 'GLOSSARAY_DEVICE_TOKEN=%s\n' "$device_token"
+  printf 'GLOSSARAY_ALLOWED_ORIGINS=%s\n' "$public_origin"
+  printf 'PUBLIC_SITE_URL=%s\n' "$public_origin"
+  printf 'GLOSSARAY_PUBLIC_DIR=./web/dist\n'
+} >.env
+
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  docker compose up -d --build
+  echo
+  echo "Glossaray is running at $public_origin"
+elif [[ $(uname -s) == "Darwin" ]]; then
+  if ! command -v bun >/dev/null 2>&1; then
+    if ! command -v brew >/dev/null 2>&1; then
+      echo "Install Homebrew from https://brew.sh, then run ./setup again."
+      exit 1
+    fi
+    echo "Installing Bun with Homebrew..."
+    brew install bun
+  fi
+  if ! command -v npm >/dev/null 2>&1; then
+    if ! command -v brew >/dev/null 2>&1; then
+      echo "Node/npm is required. Install it, then run ./setup again."
+      exit 1
+    fi
+    echo "Installing Node with Homebrew..."
+    brew install node
+  fi
+  echo "Building Glossaray..."
+  (cd web && npm ci && PUBLIC_SITE_URL="$public_origin" npm run build)
+  echo
+  echo "Glossaray is running at $public_origin"
+  echo "Press Ctrl-C to stop it."
+  echo
+  echo "Device token (save this for flashing):"
+  echo "$device_token"
+  echo
+  exec bun run server/src/index.ts
+else
+  echo "Install Docker, or install Bun and npm, then run ./setup again."
+  exit 1
+fi
+
+echo
+echo "Device token (save this for flashing):"
+echo "$device_token"
