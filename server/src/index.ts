@@ -1,4 +1,5 @@
 /** Serve the static website and proxy browser/device audio over WebSockets. */
+import pkg from "../package.json";
 import { GeminiSession } from "./gemini";
 import { createGate } from "./gate";
 import { deviceIsAuthorized } from "./device";
@@ -77,6 +78,7 @@ const server = Bun.serve<SocketData, {}>({
     // provider: a health check that fails when Google is down would get the
     // container restarted, which fixes nothing.
     if (url.pathname === "/healthz") return json({ ok: true });
+    if (url.pathname === "/health") return json({ status: "ok", service: "glossaray", version: pkg.version });
 
     // What the page needs to build its language menu, derived from the same
     // sets the server enforces, so the UI cannot offer a pair that is refused.

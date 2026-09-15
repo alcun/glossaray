@@ -13,10 +13,13 @@ FROM oven/bun:1-alpine AS run
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 GLOSSARAY_PUBLIC_DIR=/app/public
 
+COPY server/package.json ./
 COPY server/src ./src
 COPY --from=web /src/web/dist ./public
 
 # Bun's image ships a non-root `bun` user; use it.
+# tini as PID 1 reaps orphaned child processes.
+RUN apk add --no-cache tini
 USER bun
 EXPOSE 3000
 
@@ -25,4 +28,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=4s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/healthz || exit 1
 
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["bun", "run", "src/index.ts"]

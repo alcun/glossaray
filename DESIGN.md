@@ -14,6 +14,8 @@ language pairs and the translation instruction are server-side configuration.
 
 ## HTTP endpoints
 
+- `GET /health`: the same liveness as `{status, service, version}`, with the
+  version from `server/package.json`.
 - `GET /healthz`: server liveness without starting a provider session.
 - `GET /v1/pairs`: supported language pairs and audio configuration.
 - `/ws`: WebSocket upgrade for a translation session.
