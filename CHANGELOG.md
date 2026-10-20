@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.2] - Unreleased
+
+### Fixed
+
+- `/robots.txt` and `/sitemap.xml` exist. Before, both returned the page
+  itself, so crawlers got HTML where they expected a robots file and a sitemap.
+- An unknown path returns 404 instead of the page with a 200, so search
+  engines do not index copies of the site under made-up URLs.
+
 ## [1.0.1] - 2026-09-23
 
 ### Changed

@@ -90,8 +90,9 @@ const server = Bun.serve<SocketData, {}>({
       });
     }
 
-    // Static page. Bun.file streams and sets content-type; a directory or a
-    // missing file falls back to index.html so the page owns its own routing.
+    // Static page. Bun.file streams and sets content-type. A missing file gets
+    // the page with a 404 status: there is one page, so any other path is a
+    // mistake, and a 200 told crawlers it was a second copy of the site.
     const path = url.pathname === "/" ? "/index.html" : url.pathname;
     const file = Bun.file(`${PUBLIC_DIR}${path}`);
     if (await file.exists()) {
@@ -102,7 +103,7 @@ const server = Bun.serve<SocketData, {}>({
       });
     }
     const index = Bun.file(`${PUBLIC_DIR}/index.html`);
-    if (await index.exists()) return new Response(index, { headers: { "cache-control": "no-cache" } });
+    if (await index.exists()) return new Response(index, { status: 404, headers: { "cache-control": "no-cache" } });
     return new Response("not found", { status: 404 });
   },
 
