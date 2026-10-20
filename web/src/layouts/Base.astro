@@ -37,6 +37,20 @@ const canonical = new URL(Astro.url.pathname, site).href;
     <meta property="og:url" content={canonical} />
     <meta name="twitter:card" content="summary" />
     <meta property="og:image" content={new URL("/icon-512.png", site).href} />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="About Glossaray, for assistants" />
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        name: "Glossaray",
+        url: new URL("/", site).href,
+        description,
+        applicationCategory: "UtilitiesApplication",
+        operatingSystem: "Any browser with a microphone",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "GBP" },
+      })}
+    />
 
     <!--
       LoggerLizard analytics. A PUBLIC key, whitelisted to this host - a public

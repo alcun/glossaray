@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3] - Unreleased
+
+### Added
+- `/llms.txt`: what Glossaray is, its languages and its privacy terms, for
+  assistants asked about it. It says plainly that there is no agent API.
+- Structured data describing the web app, so search engines can tell what the
+  page is.
+
 ## [1.0.2] - 2026-10-20
 
 ### Fixed
