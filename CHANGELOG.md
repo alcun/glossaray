@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.3] - Unreleased
+## [1.0.3] - 2026-10-20
 
 ### Added
 - `/llms.txt`: what Glossaray is, its languages and its privacy terms, for
